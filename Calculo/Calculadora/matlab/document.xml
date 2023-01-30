@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[classdef Calculadora < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                matlab.ui.Figure
+        btnMaxs                 matlab.ui.control.Button
+        graph                   matlab.ui.control.UIAxes
+        btnMins                 matlab.ui.control.Button
+        btnMNew                 matlab.ui.control.Button
+        btnMTrap                matlab.ui.control.Button
+        btnMSimp                matlab.ui.control.Button
+        EcuacionEditFieldLabel  matlab.ui.control.Label
+        txtEcuacion             matlab.ui.control.EditField
+    end
+
+    
+    properties (Access = private)
+         %Property % Description
+        strEcuacion = '';
+        val_a = 0;
+        val_b = 0;
+        val_c = 0;
+    end
+    
+    methods (Access = private)
+        
+        function solveMaxs(app, eq)
+            try
+                derivada = diff(eq);
+                try
+                    puntos_criticos = solve(derivada, "Real", true);
+                    try
+                        seg_derivada = diff(derivada);
+                        results = subs(seg_derivada, puntos_criticos);
+                        maxs = [];
+                        for i = 1:length(results)
+                            if results(i) < 0 
+                                maxs = [maxs puntos_criticos(i)];
+                            end
+                        end
+                        if ~isempty(maxs)
+                            y = [];
+                            for i = 1:length(maxs)
+                                val = subs(eq, maxs(i));
+                                y = [y val];
+                            end
+                            y = unique(y,"stable");
+                            coords = [];
+                            plots = [];
+                            for i = 1:length(maxs)
+                                x1 = arrayfun(@char, maxs(i), "uniform", 0);
+                                y1 = arrayfun(@char, y(i), "uniform", 0);
+                                coords = [coords strcat(x1, ", ", y1)];
+                                plot_act = plot(app.graph, maxs(i), y(i), "r*");
+                                plots = [plots plot_act];
+                            end
+                            legend(app.graph, plots, coords);
+                        else
+                            warndlg("La funcion no contiene algun maximo", "¡Advertencia");    
+                        end
+                    catch ExBiDer
+                        disp(ExBiDer);
+                        warndlg("La funcion no contiene algun maximo", "¡Advertencia");    
+                    end
+                catch ExSolveDer
+                    disp(ExSolveDer);
+                    warndlg("La funcion no contiene algun maximo", "¡Advertencia");    
+                end
+            catch ExPrim
+                disp(ExPrim);
+                warndlg("La funcion no contiene algun maximo", "¡Advertencia");    
+            end
+            app.graph.NextPlot = "replace";
+        end
+    
+        function solveMins(app, eq)
+            try
+                derivada = diff(eq);
+                try
+                    puntos_criticos = solve(derivada, "Real", true);
+                    try
+                        seg_derivada = diff(derivada);
+                        results = subs(seg_derivada, puntos_criticos);
+                        results_ref = unique(results, "stable");
+                        mins = [];
+                        for i = 1:length(results_ref)
+                            if results_ref(i) >= 0 
+                                mins = [mins puntos_criticos(i)];
+                            end
+                        end
+                        if ~isempty(mins)
+                            y = [];
+                            for i = 1:length(mins)
+                                val = subs(eq, mins(i));
+                                y = [y val];
+                            end
+                            coords = [];
+                            plots = [];
+                            for i = 1:length(mins)
+                                x1 = arrayfun(@char, mins(i), "uniform", 0);
+                                y1 = arrayfun(@char, y(i), "uniform", 0);
+                                coords = [coords strcat(x1, ", ", y1)];
+                                plot_act = plot(app.graph, mins(i), y(i), "r*");
+                                plots = [plots plot_act];
+                            end
+                            legend(app.graph, plots, coords);
+                        else
+                            warndlg("La funcion no contiene algun minimo", "¡Advertencia");    
+                        end
+                    catch ExBiDer
+                        disp(ExBiDer);
+                        warndlg("La funcion no contiene algun minimo", "¡Advertencia");    
+                    end
+                catch ExSolveDer
+                    disp(ExSolveDer);
+                    warndlg("La funcion no contiene algun minimo", "¡Advertencia");    
+                end
+            catch ExPrim
+                disp(ExPrim);
+                warndlg("La funcion no contiene algun minimo", "¡Advertencia");    
+            end
+            app.graph.NextPlot = "replace";
+        end
+    
+        function solveNewt(app, eq)
+            try
+                derivada = diff(eq); 
+                epsilon = app.val_a; Vo = app.val_c; n = app.val_b;
+                epsilon_temp = 1; reps = 0;
+                while epsilon_temp > epsilon &&  reps <= n
+                    f = vpa(subs(eq, Vo));
+                    fx_prim = vpa(subs(derivada, Vo));
+                    Vo_1 = Vo - (f/fx_prim);
+                    epsilon_temp = abs(Vo_1 - Vo);
+                    Vo = Vo_1;
+                    reps = reps + 1;
+                end
+                root_plot = plot(app.graph, Vo, 0,"m*");
+                x1 = arrayfun(@char, Vo, "uniform", 0);
+                legend(app.graph, root_plot, x1);
+            catch ExPrim
+                disp(ExPrim);
+                warndlg("La funcion no es diferenciable", "¡Advertencia");    
+            end
+            app.graph.NextPlot = "replace";
+        end
+        
+        function solveTrap(app, eq)
+            lim_inf = app.val_b; lim_sup = app.val_a; n = app.val_c;
+            delta_x = (lim_sup-lim_inf)/n;
+            suma = 0;
+            for i = lim_inf:delta_x:lim_sup
+                if i == lim_inf || i == lim_sup
+                    suma = suma + (subs(eq, i)/2);
+                else
+                    suma = suma + subs(eq, i);
+                end
+            end
+            area = vpa(delta_x*suma);
+            var = symvar(eq, 1);
+            x = [0 lim_sup lim_sup lim_sup];
+            y = [0 0 0 subs(eq,var,lim_sup)];
+            plot(app.graph, x,y,"b--");
+            area_val = arrayfun(@char, area, "uniform", 0);
+            area_label = strcat("Area: ", area_val, " u2");
+            legend(app.graph, area_label);
+            app.graph.NextPlot = "replace";
+        end
+    
+        function solveSimp(app, eq)
+            lim_inf = app.val_b; lim_sup = app.val_a; n = app.val_c;
+            delta_x = (lim_sup-lim_inf)/n;
+            suma = 0; pos = 1;
+            for i = lim_inf:delta_x:lim_sup
+                val = subs(eq,i);
+                if i == lim_inf || i == lim_sup
+                    suma = suma + val;
+                elseif mod(pos,2) == 0
+                    suma = suma + (4*val);
+                else
+                    suma = suma + (2*val);
+                end
+                pos = pos + 1;
+            end
+            area = vpa(delta_x*suma);
+            var = symvar(eq, 1);
+            x = [0 lim_sup lim_sup lim_sup];
+            y = [0 0 0 subs(eq,var,lim_sup)];
+            plot(app.graph, x,y,"r--");
+            area_val = arrayfun(@char, area, "uniform", 0);
+            area_label = strcat("Area: ", area_val, " u2");
+            legend(app.graph, area_label);
+            app.graph.NextPlot = "replace";
+        end
+        
+    end
+    
+
+    methods (Access = private)
+
+        % Button pushed function: btnMaxs
+        function btnMaxsButtonPushed(app, event)
+            if isempty(app.strEcuacion)
+                warndlg("Por favor introduzca una ecuacion", "¡Advertencia!");
+            else
+                prompt = {'Desde:','Hasta:'};
+            dlgtitle = 'Valores de tabulacion';
+            dims = [1 42];
+            answer = inputdlg(prompt,dlgtitle, dims);
+            
+            eq = str2sym(app.strEcuacion);
+            var = symvar(eq, 1);
+            x = linspace(str2double(answer{1}), str2double(answer{2}));
+            y = subs(eq,var,x);
+            plot(app.graph,x,y,'Color',"b");
+            app.graph.NextPlot = "add";
+            
+            solveMaxs(app, eq);
+            
+            app.graph.XGrid = 1; app.graph.YGrid = 1;
+            app.graph.XLim = [-10 10]; app.graph.YLim = [-10 10];
+            
+            end
+        end
+
+        % Button pushed function: btnMins
+        function btnMinsButtonPushed(app, event)
+            if isempty(app.strEcuacion)
+                warndlg("Por favor introduzca una ecuacion", "¡Advertencia!");
+            else
+                prompt = {'Desde:','Hasta:'};
+                dlgtitle = 'Valores de tabulacion';
+                dims = [1 42];
+                answer = inputdlg(prompt,dlgtitle, dims);
+                
+                eq = str2sym(app.strEcuacion);
+                var = symvar(eq, 1);
+                x = linspace(str2double(answer{1}), str2double(answer{2}));
+                y = subs(eq,var,x);
+                plot(app.graph,x,y,'Color',"g");
+                app.graph.NextPlot = "add";
+                
+                solveMins(app, eq);
+                
+                app.graph.XGrid = 1; app.graph.YGrid = 1;
+                app.graph.XLim = [-10 10]; app.graph.YLim = [-10 10];
+            
+            end
+        end
+
+        % Button pushed function: btnMNew
+        function btnMNewButtonPushed(app, event)
+            if isempty(app.strEcuacion)
+                warndlg("Por favor introduzca una ecuacion", "¡Advertencia!");
+            else
+                prompt = {'Desde:','Hasta:', "Epsilon:", "Numero de Repeticiones:", "Valor de inicio:"};
+                dlgtitle = 'Valores';
+                dims = [1 42];
+                answer = inputdlg(prompt,dlgtitle, dims);
+                
+                app.val_a = str2double(answer{3});
+                app.val_b = str2double(answer{4});
+                app.val_c = str2double(answer{5});
+                
+                eq = str2sym(app.strEcuacion);
+                var = symvar(eq, 1);
+                x = linspace(str2double(answer{1}), str2double(answer{2}));
+                y = subs(eq,var,x);
+                
+                plot(app.graph,x,y,'Color',"r");
+                app.graph.NextPlot = "add";
+                
+                solveNewt(app, eq);
+                
+                app.graph.XGrid = 1; app.graph.YGrid = 1;
+                app.graph.XLim = [-10 10]; app.graph.YLim = [-10 10];
+                
+            end
+        end
+
+        % Button pushed function: btnMTrap
+        function btnMTrapButtonPushed(app, event)
+            if isempty(app.strEcuacion)
+                warndlg("Por favor introduzca una ecuacion", "¡Advertencia!");
+            else
+                prompt = {'Desde:','Hasta:', "Limite Superior:", "Limite Inferior:", "N:"};
+                dlgtitle = 'Valores';
+                dims = [1 42];
+                answer = inputdlg(prompt,dlgtitle, dims);
+                
+                app.val_a = str2double(answer{3});
+                app.val_b = str2double(answer{4});
+                app.val_c = str2double(answer{5});
+                
+                eq = str2sym(app.strEcuacion);
+                var = symvar(eq, 1);
+                x = linspace(str2double(answer{1}), str2double(answer{2}));
+                y = subs(eq,var,x);
+                
+                plot(app.graph,x,y,'Color',"r");
+                app.graph.NextPlot = "add";
+                
+                solveTrap(app, eq);
+                
+                app.graph.XGrid = 1; app.graph.YGrid = 1;
+                app.graph.XLim = [-10 10]; app.graph.YLim = [-10 10];
+                
+            end
+        end
+
+        % Button pushed function: btnMSimp
+        function btnMSimpButtonPushed(app, event)
+            if isempty(app.strEcuacion)
+                warndlg("Por favor introduzca una ecuacion", "¡Advertencia!");
+            else
+                prompt = {'Desde:','Hasta:', "Limite Superior:", "Limite Inferior:", "N:"};
+                dlgtitle = 'Valores';
+                dims = [1 42];
+                answer = inputdlg(prompt,dlgtitle, dims);
+                
+                app.val_a = str2double(answer{3});
+                app.val_b = str2double(answer{4});
+                app.val_c = str2double(answer{5});
+                
+                eq = str2sym(app.strEcuacion);
+                var = symvar(eq, 1);
+                x = linspace(str2double(answer{1}), str2double(answer{2}));
+                y = subs(eq,var,x);
+                
+                plot(app.graph,x,y,'Color',"b");
+                app.graph.NextPlot = "add";
+                
+                solveTrap(app, eq);
+                
+                app.graph.XGrid = 1; app.graph.YGrid = 1;
+                app.graph.XLim = [-10 10]; app.graph.YLim = [-10 10];
+                
+            end
+        end
+
+        % Value changed function: txtEcuacion
+        function txtEcuacionValueChanged(app, event)
+            app.strEcuacion = event.Value;            
+        end
+    end
+
+    % App initialization and construction
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure
+            app.UIFigure = uifigure;
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'UI Figure';
+
+            % Create btnMaxs
+            app.btnMaxs = uibutton(app.UIFigure, 'push');
+            app.btnMaxs.ButtonPushedFcn = createCallbackFcn(app, @btnMaxsButtonPushed, true);
+            app.btnMaxs.FontName = 'Lucida Bright';
+            app.btnMaxs.FontSize = 14;
+            app.btnMaxs.Position = [126 366 105 24];
+            app.btnMaxs.Text = 'Maximos';
+
+            % Create graph
+            app.graph = uiaxes(app.UIFigure);
+            xlabel(app.graph, 'X')
+            ylabel(app.graph, 'Y')
+            app.graph.Position = [18 21 596 274];
+
+            % Create btnMins
+            app.btnMins = uibutton(app.UIFigure, 'push');
+            app.btnMins.ButtonPushedFcn = createCallbackFcn(app, @btnMinsButtonPushed, true);
+            app.btnMins.FontName = 'Lucida Bright';
+            app.btnMins.FontSize = 14;
+            app.btnMins.Position = [126 312 105 24];
+            app.btnMins.Text = 'Minimos';
+
+            % Create btnMNew
+            app.btnMNew = uibutton(app.UIFigure, 'push');
+            app.btnMNew.ButtonPushedFcn = createCallbackFcn(app, @btnMNewButtonPushed, true);
+            app.btnMNew.FontName = 'Lucida Bright';
+            app.btnMNew.FontSize = 14;
+            app.btnMNew.Position = [277.5 366 138 24];
+            app.btnMNew.Text = 'Metodo de Newton';
+
+            % Create btnMTrap
+            app.btnMTrap = uibutton(app.UIFigure, 'push');
+            app.btnMTrap.ButtonPushedFcn = createCallbackFcn(app, @btnMTrapButtonPushed, true);
+            app.btnMTrap.FontName = 'Lucida Bright';
+            app.btnMTrap.FontSize = 14;
+            app.btnMTrap.Position = [272.5 312 148 24];
+            app.btnMTrap.Text = 'Metodo del Trapecio';
+
+            % Create btnMSimp
+            app.btnMSimp = uibutton(app.UIFigure, 'push');
+            app.btnMSimp.ButtonPushedFcn = createCallbackFcn(app, @btnMSimpButtonPushed, true);
+            app.btnMSimp.FontName = 'Lucida Bright';
+            app.btnMSimp.FontSize = 14;
+            app.btnMSimp.Position = [444 340 145 24];
+            app.btnMSimp.Text = 'Metodo de Simpson';
+
+            % Create EcuacionEditFieldLabel
+            app.EcuacionEditFieldLabel = uilabel(app.UIFigure);
+            app.EcuacionEditFieldLabel.HorizontalAlignment = 'right';
+            app.EcuacionEditFieldLabel.FontSize = 18;
+            app.EcuacionEditFieldLabel.Position = [61 431 85 22];
+            app.EcuacionEditFieldLabel.Text = 'Ecuacion:';
+
+            % Create txtEcuacion
+            app.txtEcuacion = uieditfield(app.UIFigure, 'text');
+            app.txtEcuacion.ValueChangedFcn = createCallbackFcn(app, @txtEcuacionValueChanged, true);
+            app.txtEcuacion.HorizontalAlignment = 'center';
+            app.txtEcuacion.FontSize = 14;
+            app.txtEcuacion.Position = [161 431 419 22];
+        end
+    end
+
+    methods (Access = public)
+
+        % Construct app
+        function app = Calculadora
+
+            % Create and configure components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end]]></w:t></w:r></w:p></w:body></w:document>
