@@ -1,8 +1,0 @@
-
------ Nueva Ejecucion -----
-Archivo: 3.c
-'(' insertado correctamente en linea: 5 col: 13
-Conjunto ( ) cerrado correctamente, linea: 5, col: 14,
- '{' insertado correctamente en linea: 5 col: 15
-'[' insertado correctamente en linea: 8 col: 10
-Error 3: Se esperaba un caracter de cierre ']' pero se encontro '}' linea: 8, col: 12
